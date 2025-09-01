@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Medical Diagnosis</title>
+  <style>
+    body { font-family: Arial; max-width: 600px; margin: 40px auto; }
+    textarea { width: 100%; height: 100px; }
+    button { padding: 10px 20px; margin-top: 10px; }
+    .result { margin-top: 20px; }
+    .result div { margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <h1>AI Doctor Assistant</h1>
+  <p>Describe your symptoms below:</p>
+  <textarea id="inputText" placeholder="e.g., I have a fever and feel tired..."></textarea>
+  <br />
+  <button onclick="diagnose()">Diagnose</button>
+
+  <div class="result" id="resultBox"></div>
+
+  <script>
+    async function diagnose() {
+      const input = document.getElementById("inputText").value;
+      const resultBox = document.getElementById("resultBox");
+      resultBox.innerHTML = "Loading...";
+
+      const res = await fetch("/diagnose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ input }),
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        resultBox.innerHTML = `<div style="color: red;">Error: ${data.error}</div>`;
+      } else {
+        resultBox.innerHTML = "<h3>Top Predictions:</h3>";
+        data.forEach((item, idx) => {
+          resultBox.innerHTML += `<div>
+            <strong>#${idx + 1}: ${item.disease}</strong><br/>
+            Score: ${item.score} <br/>
+            Matched symptom: <i>${item.matched_symptom}</i>
+          </div>`;
+        });
+      }
+    }
+  </script>
+</body>
+</html>
