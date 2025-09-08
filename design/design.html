@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>OTC Recommender</title>
+  <style>
+    body { font-family: ui-sans-serif, system-ui; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
+    .row { margin: 1rem 0; }
+    .btn { padding: 10px 16px; border: 1px solid #ddd; border-radius: 8px; cursor: pointer; }
+    .card { border: 1px solid #eee; border-radius: 10px; padding: 12px; margin: 8px 0; }
+    .grid { display: grid; gap: 12px; }
+    .muted { color:#666; font-size:12px; }
+    input, textarea { width: 100%; padding: 10px; border:1px solid #ddd; border-radius:8px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .pill { display:inline-block; padding:2px 8px; border:1px solid #ddd; border-radius:999px; margin-right:6px; font-size:12px;}
+  </style>
+</head>
+<body>
+  <h1>OTC Recommender</h1>
+
+  <div class="row">
+    <label for="q"><b>Symptoms or disease</b> (e.g., <i>fever and sore throat</i> or <i>influenza</i>)</label>
+    <textarea id="q" rows="3">fever and sore throat</textarea>
+  </div>
+
+  <div class="row two">
+    <div>
+      <label>Ingredients per symptom</label>
+      <input id="kIng" type="number" min="1" max="10" value="3"/>
+    </div>
+    <div>
+      <label>Cards per ingredient</label>
+      <input id="kCards" type="number" min="1" max="10" value="2"/>
+    </div>
+  </div>
+
+  <div class="row">
+    <button id="run" class="btn">Recommend</button>
+    <span id="status" class="muted" style="margin-left:8px;"></span>
+  </div>
+
+  <div id="out"></div>
+
+  <p class="muted" style="margin-top:24px">
+    Disclaimer: Not medical advice. Always check labels and consult professionals.
+  </p>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+
+    $('run').onclick = async () => {
+      const text = $('q').value.trim();
+      const ingredients_per_symptom = parseInt($('kIng').value || '3', 10);
+      const cards_per_ingredient = parseInt($('kCards').value || '2', 10);
+      if (!text) { alert('Enter symptoms or a disease'); return; }
+
+      $('status').textContent = 'Loading...';
+      $('out').innerHTML = '';
+
+      try {
+        const res = await fetch('/assist', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ text, ingredients_per_symptom, cards_per_ingredient })
+        });
+        if (!res.ok) throw new Error('Request failed: ' + res.status);
+        const data = await res.json();
+
+        render(data);
+        $('status').textContent = 'Done';
+      } catch (e) {
+        console.error(e);
+        $('status').textContent = 'Error';
+        $('out').innerHTML = `<div class="card">Error: ${e.message}</div>`;
+      }
+    };
+
+    function render(data) {
+      const root = $('out');
+
+      /* Top disease */
+      if (data.top_disease) {
+        root.insertAdjacentHTML('beforeend', `
+          <div class="card">
+            <div><b>Top disease</b></div>
+            <div style="margin-top:6px;">${escapeHtml(data.top_disease)}</div>
+          </div>
+        `);
+      }
+
+      /* Selected symptoms (Top 5) */
+      if (data.selected_symptoms?.length) {
+        const pills = data.selected_symptoms.map(s => `<span class="pill">${s}</span>`).join(' ');
+        root.insertAdjacentHTML('beforeend', `
+          <div class="card">
+            <div><b>Selected symptoms (Top 5)</b></div>
+            <div style="margin-top:6px;">${pills}</div>
+          </div>
+        `);
+      }
+
+      // Diagnosis (raw view)
+      root.insertAdjacentHTML('beforeend', `
+        <div class="card">
+          <div><b>Diagnosis (top-k)</b></div>
+          <pre style="white-space:pre-wrap;font-size:12px;margin:6px 0 0;">${escapeHtml(JSON.stringify(data.diagnosis, null, 2))}</pre>
+        </div>
+      `);
+
+      // OTC Recommendations
+      const rec = data.otc_recommendations || {};
+      (rec.results || []).forEach(block => {
+        const ingredients = (block.ingredients || []).map(x => `<span class="pill">${x.ingredient}</span>`).join(' ');
+        const cards = (block.candidates || []).map(c => `
+          <div class="card">
+            <div><b>${escapeHtml(c.title || c.brand_name || c.generic_name || c.ingredient)}</b></div>
+            ${c.label_url ? `<div><a href="${c.label_url}" target="_blank" rel="noreferrer">Drug Label</a></div>` : ``}
+            ${c.purpose ? `<div><b>Purpose:</b> ${escapeHtml(c.purpose)}</div>` : ``}
+            ${c.indications ? `<div><b>Indications:</b> ${escapeHtml(c.indications)}</div>` : ``}
+          </div>
+        `).join('');
+
+        root.insertAdjacentHTML('beforeend', `
+          <div class="card">
+            <div><b>Symptom:</b> ${escapeHtml(block.symptom)}</div>
+            <div style="margin:6px 0;"><b>Top ingredients:</b> ${ingredients || '(none)'}</div>
+            <div class="grid">${cards || '<div class="muted">No cards</div>'}</div>
+          </div>
+        `);
+      });
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;')
+        .replaceAll('"','&quot;')
+        .replaceAll("'",'&#39;');
+    }
+  </script>
+</body>
+</html>

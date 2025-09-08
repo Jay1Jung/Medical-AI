@@ -12,8 +12,10 @@
 from __future__ import annotations
 import json, re
 from typing import Dict, List, Any
-from app.services.openfda_client import search_labels_all_pages  # 제품 카드용
-SYMPTOM_MAP_PATH = "symptom_to_ingredients_openfda.json"
+from services.openfda_client import search_labels_all_pages  # 제품 카드용
+import os, json, re
+BASE_DIR = os.path.dirname(__file__)
+SYMPTOM_MAP_PATH = os.path.join(BASE_DIR, "symptom_to_ingredients_openfda.json")
 
 # 맵 로드
 with open(SYMPTOM_MAP_PATH, "r", encoding="utf-8") as f:

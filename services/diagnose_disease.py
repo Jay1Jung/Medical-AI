@@ -7,10 +7,19 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 import torch.nn.functional as F
 import argparse
+import os
 
+BASE_DIR = os.path.dirname(__file__)
 # KB 파일
-KB_SYMPTOMS = "kb_symptoms.json"
-KB_EMB = "kb_symptom_embeddings.npz"
+def _dp(name: str) -> str:
+    # services/ 기준 절대경로 생성
+    return os.path.join(BASE_DIR, name)
+
+KB_SYMPTOMS = _dp("kb_symptoms.json")
+ENCY_SYMPTOMS = _dp("ency_symptoms.json")                   # 사용 중이면
+KB_SYMPTOM_EMB = _dp("kb_symptom_embeddings.npz")           # 사용 중이면
+DISEASE_SYMPTOMS_PATH = _dp("disease_symptoms_merged.json")
+
 
 # 사용자 입력 분리용(쉼표/and/with 등)
 SEP_RE = re.compile(r"[.,;]|(?:\band\b)|(?:\bwith\b)", re.I)
@@ -53,7 +62,7 @@ def _load_kb():
     }
     emb_model_name = jb.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
 
-    emb_np = np.load(KB_EMB)["embeddings"]    
+    emb_np = np.load(KB_SYMPTOM_EMB)["embeddings"]    
     emb = torch.from_numpy(emb_np).float() 
 
     emb = F.normalize(emb, p=2, dim=1)
